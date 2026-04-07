@@ -32,6 +32,10 @@ Wenn nicht angegeben und nicht vererbbar, setze "".
 - "ep": EINZELPREIS (EP) netto in EUR. KRITISCH:
   * EP steht in der VORLETZTEN Preis-Spalte ("E.-Preis", "EP", "Einzelpreis")
   * GP/Betrag steht in der LETZTEN Spalte ("Betrag", "GP", "Gesamtpreis")
+  * Kontrolliere: EP x Menge = GP (ungefaehr). Wenn nicht, Spalten verwechselt!
+  * Wenn kein EP angegeben, setze 0
+  * EP steht in der VORLETZTEN Preis-Spalte ("E.-Preis", "EP", "Einzelpreis")
+  * GP/Betrag steht in der LETZTEN Spalte ("Betrag", "GP", "Gesamtpreis")
   * Kontrolliere: EP x Menge = GP (ungefaehr). Wenn nicht, hast du Spalten verwechselt!
   * Wenn nur EIN Preis sichtbar und Menge > 1: pruefe ob EP oder GP
   * Wenn kein EP angegeben, setze 0

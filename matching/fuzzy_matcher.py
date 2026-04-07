@@ -437,14 +437,6 @@ def _is_internal(bez):
         "vorankuendigung", "sige-plan", "lastplattendruckversuch",
         "kontrollpruefung", "grenzsteine", "lichtbilder", "bestandsplan",
         "regiearbeiten", "stundenlohn",
-        # Baustelleneinrichtung (Firma macht selbst, keine Kosten)
-        "baustelleneinrichtung", "vorhalten", "bereithalten",
-        "baustelle einrichten", "baustelle räumen",
-        # Abbruch/Rueckbau (reine Arbeit)
-        "abbrechen stoffe aufnehmen", "aufbrechen", "ausbauen und entsorgen",
-        # Overhead
-        "verkehrssicherung", "absperrung",
-        "verrechnungssatz", "verrechnungsatz", "stundensatz",
     ])
 
 
