@@ -276,6 +276,38 @@ PRICE_RANGES = {
     ("erstinspektion","ps"): (400,3000),
     ("abnahme","ps"): (300,3000),
     ("dokumentation","ps"): (200,3000),
+    # === GUTACHTER / LABOR / DIENSTLEISTUNGEN ===
+    ("probenahme","st"): (80,500),
+    ("probenehmer","st"): (80,400),
+    ("beprobung","st"): (80,500),
+    ("haufwerksbeprobung","st"): (150,600),
+    ("laboruntersuchung","st"): (100,800),
+    ("untersuchungsbericht","st"): (200,1500),
+    ("untersuchung","st"): (100,1500),
+    ("parameterumfang","st"): (100,800),
+    ("gutachten","st"): (500,5000),
+    ("gutachten","ps"): (500,10000),
+    ("bodengutachten","st"): (500,5000),
+    ("baugrunduntersuchung","st"): (500,5000),
+    ("rammsondierung","st"): (200,1500),
+    ("kampfmittelsondierung","st"): (300,3000),
+    ("kampfmittelsondierung","m²"): (1,15),
+    ("schadstoffuntersuchung","st"): (200,1500),
+    ("entsorgungsnachweis","st"): (100,500),
+    # Stundensaetze
+    ("verrechnungssatz","h"): (50,200),
+    ("verrechnungsatz","h"): (50,200),
+    ("stundensatz","h"): (40,200),
+    ("geschaeftsleitung","h"): (100,250),
+    ("projektleitung","h"): (80,200),
+    ("projektbearbeitung","h"): (60,150),
+    ("mitarbeiter","h"): (40,120),
+    ("bauueberwachung","h"): (70,180),
+    ("baustellentermin","st"): (100,500),
+    # An-/Abfahrt
+    ("anfahrt","st"): (30,300),
+    ("abfahrt","st"): (30,300),
+    ("an- und abfahrt","st"): (50,400),
 }
 
 MAX_EP = {"m²":300,"m³":500,"m":600,"t":500,"st":30000,"kg":100,"ps":50000}

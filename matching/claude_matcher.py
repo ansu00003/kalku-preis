@@ -175,6 +175,15 @@ def determine_column(bezeichnung: str) -> str:
         "planum", "verdichten", "planieren",
         "nassschneiden", "schneiden",
         "abbruch", "rückbau", "rodung", "fällung", "baumfällung",
+        # Gutachter / Labor / Dienstleistungen
+        "untersuchung", "probenahme", "beprobung", "laboruntersuchung",
+        "gutachten", "gutachter", "sachverständig",
+        "verrechnungssatz", "verrechnungsatz", "stundensatz",
+        "projektleitung", "projektbearbeitung", "geschäftsleitung",
+        "baustellentermin", "bauüberwachung", "baubegleitung",
+        "kampfmittel", "kampfmittelsondierung",
+        "baugrunduntersuchung", "bodengutachten", "rammsondierung",
+        "geotechnik", "abfallrechtl",
     )
     if any(k in text for k in NU_WORK):
         # Exception: "liefern und pflanzen" has material component → still Stoffe

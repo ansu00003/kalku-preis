@@ -58,6 +58,17 @@ NU_TRADES = [
     "steinmetz", "naturstein",
     "spezialtiefbau", "bohrpfahl", "spundwand",
     "vermessung", "planunterlagen", "dokumentation", "prüfung",
+    # Gutachter / Labor / Fachtechniker
+    "untersuchung", "probenahme", "beprobung", "laboruntersuchung",
+    "gutachten", "gutachter", "sachverständig",
+    "schadstoff", "altlasten", "kontamination", "entsorgungsnachweis",
+    "abfallrechtl", "abfallrechtlich", "ersatzbaustoff", "deponieverordnung",
+    "verrechnungssatz", "verrechnungsatz", "stundensatz", "honorar",
+    "projektleitung", "projektbearbeitung", "geschäftsleitung",
+    "baustellentermin", "bauüberwachung", "baubegleitung",
+    "kampfmittel", "kampfmittelsondierung", "munitionsbergung",
+    "baugrunduntersuchung", "bodengutachten", "rammsondierung",
+    "geotechnik", "geotechnisch",
 ]
 
 # Fuzzy match thresholds
