@@ -780,6 +780,13 @@ async def run_matching(project_id: str):
         "erstellen", "verdichten", "herstellen", "einbauen und verdichten",
         "nassschneiden", "schneiden", "planum", "abbruch", "rückbau",
         "abfuhr", "entsorg", "rodung", "fällung",
+        "baustelleneinrichtung", "vorhalten", "bereithalten",
+        "baustelle einrichten", "baustelle räumen",
+        "verkehrssicherung", "absperrung", "beschilderung",
+        "abbrechen", "aufnehmen", "aufbrechen", "ausbauen", "abtragen",
+        "lösen", "laden", "fördern", "lagern",
+        "planieren", "profilieren", "begradigen",
+        "verdichtungsprüfung", "kontrollprüfung",
     )
     unmatched_material = []
     for pos in lv_positions:
@@ -789,7 +796,13 @@ async def run_matching(project_id: str):
         # Skip pure work/labor positions
         is_work = any(kw in bez_lower for kw in WORK_KEYWORDS)
         # But keep "liefern und einbauen" (has material component)
-        if "liefer" in bez_lower or "material" in bez_lower:
+        _MAT_NAMES = ("sand", "kies", "schotter", "splitt", "boden",
+                      "beton", "verfüllung", "bettung", "substrat",
+                      "frostschutz", "oberboden", "mutterboden",
+                      "tragschicht", "schicht", "rohr", "folie",
+                      "pflaster", "bordstein", "rinne", "liefer",
+                      "material", "mulch", "hackschnitzel")
+        if any(mk in bez_lower for mk in _MAT_NAMES):
             is_work = False
         if is_work:
             continue
@@ -1220,4 +1233,4 @@ def _get_match_summary(proj: dict) -> dict:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=300)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

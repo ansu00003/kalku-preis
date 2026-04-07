@@ -281,7 +281,6 @@ function getFileFromEntry(fileEntry) {
 async function uploadAndProcess() {
     if (!state.lvFile) return alert('Bitte LV-Datei wählen');
     showLoading('Dateien werden hochgeladen…', true);
-    startProgressPolling();
 
     // Step 1: Upload all files
     const form = new FormData();
@@ -300,7 +299,6 @@ async function uploadAndProcess() {
     form.append('supplier_names', suppliers.join(','));
 
     try {
-        // Use XMLHttpRequest for upload progress
         const uploadData = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open('POST', `/api/project/${state.projectId}/upload-files`);
@@ -309,22 +307,25 @@ async function uploadAndProcess() {
                     const pct = Math.round(e.loaded / e.total * 100);
                     document.getElementById('loadingProgressFill').style.width = pct + '%';
                     document.getElementById('loadingProgressPct').textContent = pct + '%';
-                    document.getElementById('loadingProgressStep').textContent = `Hochladen: ${(e.loaded/1024/1024).toFixed(1)} / ${(e.total/1024/1024).toFixed(1)} MB`;
+                    document.getElementById('loadingProgressStep').textContent = 'Hochladen: ' + (e.loaded/1024/1024).toFixed(1) + ' / ' + (e.total/1024/1024).toFixed(1) + ' MB';
                 }
             };
             xhr.onload = () => {
-                try { resolve(JSON.parse(xhr.responseText)); }
-                catch(e) { reject(new Error('Upload fehlgeschlagen')); }
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try { resolve(JSON.parse(xhr.responseText)); }
+                    catch(e) { reject(new Error('Antwort konnte nicht gelesen werden')); }
+                } else { reject(new Error('Server-Fehler: ' + xhr.status)); }
             };
-            xhr.onerror = () => reject(new Error('Upload fehlgeschlagen — Netzwerkfehler'));
-            xhr.ontimeout = () => reject(new Error('Upload Timeout — Dateien zu groß?'));
-            xhr.timeout = 600000; // 10 min
+            xhr.onerror = () => reject(new Error('Netzwerkfehler'));
+            xhr.ontimeout = () => reject(new Error('Upload Timeout'));
+            xhr.timeout = 600000;
             xhr.send(form);
         });
         if (uploadData.detail) throw new Error(uploadData.detail);
 
         // Step 2: Process everything
         showLoading('Dateien werden analysiert…', true);
+        startProgressPolling();
         const processRes = await fetch(`/api/project/${state.projectId}/process`, { method: 'POST' });
         const processData = await processRes.json();
         if (!processRes.ok) throw new Error(processData.detail || 'Verarbeitung fehlgeschlagen');
