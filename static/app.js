@@ -300,11 +300,28 @@ async function uploadAndProcess() {
     form.append('supplier_names', suppliers.join(','));
 
     try {
-        const uploadRes = await fetch(`/api/project/${state.projectId}/upload-files`, {
-            method: 'POST', body: form
+        // Use XMLHttpRequest for upload progress
+        const uploadData = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `/api/project/${state.projectId}/upload-files`);
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const pct = Math.round(e.loaded / e.total * 100);
+                    document.getElementById('loadingProgressFill').style.width = pct + '%';
+                    document.getElementById('loadingProgressPct').textContent = pct + '%';
+                    document.getElementById('loadingProgressStep').textContent = `Hochladen: ${(e.loaded/1024/1024).toFixed(1)} / ${(e.total/1024/1024).toFixed(1)} MB`;
+                }
+            };
+            xhr.onload = () => {
+                try { resolve(JSON.parse(xhr.responseText)); }
+                catch(e) { reject(new Error('Upload fehlgeschlagen')); }
+            };
+            xhr.onerror = () => reject(new Error('Upload fehlgeschlagen — Netzwerkfehler'));
+            xhr.ontimeout = () => reject(new Error('Upload Timeout — Dateien zu groß?'));
+            xhr.timeout = 600000; // 10 min
+            xhr.send(form);
         });
-        const uploadData = await uploadRes.json();
-        if (!uploadRes.ok) throw new Error(uploadData.detail || 'Upload fehlgeschlagen');
+        if (uploadData.detail) throw new Error(uploadData.detail);
 
         // Step 2: Process everything
         showLoading('Dateien werden analysiert…', true);
