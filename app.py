@@ -1080,6 +1080,8 @@ def _normalize_oz(oz: str) -> str:
     import re
     oz = oz.strip()
     oz = re.sub(r'^OZ\s*', '', oz, flags=re.IGNORECASE)
+    # Strip ff./alter. suffixes from offer references
+    oz = re.sub(r'\s*(ff\.?|alter\.?|alternativ)\s*$', '', oz, flags=re.IGNORECASE)
     oz = re.sub(r'\s+', '', oz)
     oz = oz.rstrip('.')
     parts = oz.split('.')
