@@ -862,3 +862,12 @@ input:focus, select:focus {
 .match-tbl tbody tr.price-check { background: rgba(248, 113, 113, 0.08); }
 .match-tbl tbody tr.price-check:hover { background: rgba(248, 113, 113, 0.14); }
 .match-tbl tbody tr.price-check .col-ep strong { color: var(--red); }
+
+.supplier-input {
+    width: 150px; padding: 0.35rem 0.6rem;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text);
+    font-size: 0.8rem; font-family: var(--mono);
+}
+.supplier-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-glow); }
+.supplier-input::placeholder { color: var(--text-dim); }

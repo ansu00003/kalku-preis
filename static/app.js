@@ -117,13 +117,13 @@ function addOfferFolder(files) {
             const path = f.webkitRelativePath || f.name;
             const parts = path.split('/');
 
-            // Skip files directly in root folder (need at least root/something/file)
-            if (parts.length < 3) continue;
+            // Files in root folder: use folder name as supplier
+            // Files in subfolder: use immediate parent as supplier
 
             // Use immediate parent folder as supplier name
-            // e.g. 04_Angebote/04_Vermessung/Berg/file.pdf → "Berg"
-            // e.g. 04_Angebote/Kohler/file.pdf → "Kohler"
-            const supplier = parts[parts.length - 2].replace(/[_-]+/g, ' ').trim();
+            const supplier = parts.length >= 2
+                ? parts[parts.length - 2].replace(/[_-]+/g, ' ').trim()
+                : 'Unbekannt';
             found.push({ file: f, supplier });
         }
 
@@ -155,8 +155,12 @@ function renderStagedOffers() {
         <div class="offer-card">
             <div class="offer-info">
                 <span class="offer-filename">${o.file.name}</span>
-                <span class="offer-meta">${o.supplier} — ${(o.file.size / 1024).toFixed(0)} KB</span>
+                <span class="offer-meta">${(o.file.size / 1024).toFixed(0)} KB</span>
             </div>
+            <input type="text" class="supplier-input" value="${o.supplier}"
+                   placeholder="Lieferant eingeben"
+                   onchange="updateSupplier(${i}, this.value)"
+                   onclick="if(this.value==='Unbekannt')this.select()">
             <button class="btn btn-sm btn-danger" onclick="removeOffer(${i})">✕</button>
         </div>
     `).join('');
@@ -216,7 +220,7 @@ async function scanDirectoryEntries(entries, parentPath, results) {
 
         if (entry.isFile) {
             const filename = entry.name.toLowerCase();
-            if (!SKIP_FILE(entry.name) && filename.startsWith('angebot') && /\.(pdf|xlsx|xls)$/i.test(filename)) {
+            if (!SKIP_FILE(entry.name) && /\.(pdf|xlsx|xls)$/i.test(filename)) {
                 const file = await getFileFromEntry(entry);
                 const supplier = parentPath.split('/').pop() || entry.name;
                 results.push({
@@ -230,10 +234,7 @@ async function scanDirectoryEntries(entries, parentPath, results) {
         }
     }
 
-    // Fallback: if no Angebot_* found at this level, grab all PDFs/Excel
-    if (parentPath === '' && results.length === 0) {
-        await scanDirectoryEntriesAll(entries, '', results);
-    }
+    // All PDFs/Excel are already included above
 }
 
 async function scanDirectoryEntriesAll(entries, parentPath, results) {
@@ -781,3 +782,10 @@ document.addEventListener('DOMContentLoaded', () => {
         zone.addEventListener('drop', () => zone.classList.remove('dragover'));
     });
 });
+
+
+function updateSupplier(index, name) {
+    if (index >= 0 && index < state.offerFiles.length) {
+        state.offerFiles[index].supplier = name.trim() || 'Unbekannt';
+    }
+}

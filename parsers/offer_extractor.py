@@ -47,6 +47,7 @@ Zusätzlich extrahiere Nebenkosten (NUR allgemein gültige Kosten für das gesam
 - "sonstige_nk": Sonstige Nebenkosten (0 wenn nicht angegeben)
 - "logistik_pct": Logistikzuschlag in Prozent (z.B. 4.4 für 4,40%), 0 wenn nicht angegeben
 
+WICHTIG: Extrahiere den FIRMENNAMEN des Lieferanten! Suche im Briefkopf, Logo, Absender, Fusszeile, Stempel, "Firma:" Feld. Setze in "lieferant_name". Wenn nicht erkennbar, setze "".
 WICHTIG: Alle Zahlenwerte MÜSSEN Zahlen sein (nicht null, nicht ""). Wenn unbekannt, setze 0.
 WICHTIG SELBSTKONTROLLE: Pruefe JEDEN Preis: EP x Menge sollte ungefaehr GP ergeben!
 WICHTIG ZAHLENFORMAT: Beachte das DEUTSCHE Zahlenformat — Komma ist DEZIMALTRENNZEICHEN, Punkt ist Tausendertrennzeichen:
@@ -62,7 +63,7 @@ WICHTIG: Frachtkosten/Transportkosten die als eigene Position aufgeführt sind (
 WICHTIG: Verpackungskosten die als eigene Position aufgeführt sind (z.B. "Verpackungs-Kosten lt. Werk 35€ Pauschale"): Ebenfalls als normale Position extrahieren mit vererbtem lv_pos_nr.
 WICHTIG: Antworte NUR mit validem JSON, keine Kommentare, kein Markdown.
 
-{{"positionen": [...], "nebenkosten": {{"fracht": 0, "verpackung": 0, "kran": 0, "sonstige_nk": 0, "logistik_pct": 0, "nk_hinweis": ""}}, "angebots_summe": 0, "gueltig_bis": "", "lieferzeit": ""}}"""
+{{"positionen": [...], "nebenkosten": {{"fracht": 0, "verpackung": 0, "kran": 0, "sonstige_nk": 0, "logistik_pct": 0, "nk_hinweis": ""}}, "angebots_summe": 0, "gueltig_bis": "", "lieferzeit": "", "lieferant_name": "Firmenname aus Briefkopf/Logo/Absender"}}"""
 
 
 MAX_IMAGES = 10  # Allow up to 10 pages for scanned PDFs
@@ -263,7 +264,7 @@ async def _retry_scan_extraction(client, supplier_name: str, filename: str, imag
 Gib NUR valides JSON aus:
 {{"positionen": [{{"pos": "", "lv_pos_nr": "", "text": "", "menge": 0, "einheit": "", "ep": 0, "gp": 0, "rabatt": 0, "stueck_laenge": 0}}],
 "nebenkosten": {{"fracht": 0, "verpackung": 0, "kran": 0, "sonstige_nk": 0, "logistik_pct": 0, "nk_hinweis": ""}},
-"angebots_summe": 0, "gueltig_bis": "", "lieferzeit": ""}}""".format(supplier_name=supplier_name)
+"angebots_summe": 0, "gueltig_bis": "", "lieferzeit": "", "lieferant_name": "Firmenname aus Briefkopf/Logo/Absender"}}""".format(supplier_name=supplier_name)
 
     content = []
     for img in images[:MAX_IMAGES]:

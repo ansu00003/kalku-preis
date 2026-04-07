@@ -229,6 +229,10 @@ async def process_files(project_id: str):
                         full_text, supplier, meta["filename"], scan_images or None
                     )
                     offer_data["source_type"] = "pdf"
+                pdf_name = offer_data.get("lieferant_name", "").strip()
+                if pdf_name and len(pdf_name) > 2:
+                    offer_data["supplier"] = pdf_name
+                    print(f"[EXTRACT] Supplier from PDF: {pdf_name}")
                 else:
                     offer_data = {"positionen": [], "error": "Empty PDF", "supplier": supplier}
             else:
@@ -1186,13 +1190,22 @@ def _expand_segments(parts: list) -> list:
 
 
 def _guess_supplier(filename: str) -> str:
-    """Try to guess supplier name from filename."""
+    """Guess supplier from filename. Reference numbers -> Unbekannt."""
+    import re
     name = Path(filename).stem
-    # Remove common patterns
-    for pattern in ["angebot", "Angebot", "offerte", "AG_", "ag_", "_2024", "_2025", "_2026"]:
-        name = name.replace(pattern, "")
-    return name.strip("_- ") or "Unbekannt"
-
+    for pat in ["angebot", "Angebot", "offerte", "Offerte", "AG_", "ag_",
+                "_2024", "_2025", "_2026", "2024", "2025", "2026"]:
+        name = name.replace(pat, "")
+    name = name.strip("_- ")
+    if not name: return "Unbekannt"
+    digits = sum(1 for c in name if c.isdigit())
+    letters = sum(1 for c in name if c.isalpha())
+    total = len(name.replace(" ", "").replace("-", "").replace("_", ""))
+    if total > 0 and (digits / total > 0.5 or letters < 3):
+        return "Unbekannt"
+    name = re.sub(r"[_\\-]+", " ", name).strip()
+    name = re.sub(r"\\s+\\d[\\d\\-]*$", "", name).strip()
+    return name or "Unbekannt"
 
 def _get_match_summary(proj: dict) -> dict:
     matches = proj.get("matches", [])
