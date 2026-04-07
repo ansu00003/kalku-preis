@@ -308,6 +308,33 @@ PRICE_RANGES = {
     ("anfahrt","st"): (30,300),
     ("abfahrt","st"): (30,300),
     ("an- und abfahrt","st"): (50,400),
+    # === BAUSTELLENEINRICHTUNG / OVERHEAD ===
+    ("baustelleneinrichtung","wo"): (20,80),
+    ("baustelleneinrichtung","ps"): (500,10000),
+    ("vorhalten","wo"): (10,60),
+    ("verkehrssicherung","ps"): (200,5000),
+    ("verkehrssicherung","wo"): (20,100),
+    # === GUTACHTER / LABOR ===
+    ("probenahme","st"): (80,500),
+    ("beprobung","st"): (80,500),
+    ("haufwerksbeprobung","st"): (150,600),
+    ("laboruntersuchung","st"): (100,800),
+    ("untersuchungsbericht","st"): (200,1500),
+    ("untersuchung","st"): (100,1500),
+    ("parameterumfang","st"): (100,800),
+    ("gutachten","st"): (500,5000),
+    ("gutachten","ps"): (500,10000),
+    ("bodengutachten","st"): (500,5000),
+    ("kampfmittelsondierung","st"): (300,3000),
+    # === STUNDENSAETZE ===
+    ("verrechnungssatz","h"): (50,200),
+    ("verrechnungsatz","h"): (50,200),
+    ("stundensatz","h"): (40,200),
+    ("projektleitung","h"): (80,200),
+    ("projektbearbeitung","h"): (60,150),
+    ("mitarbeiter","h"): (40,120),
+    ("baustellentermin","st"): (100,500),
+    ("anfahrt","st"): (30,300),
 }
 
 MAX_EP = {"m²":300,"m³":500,"m":600,"t":500,"st":30000,"kg":100,"ps":50000}
