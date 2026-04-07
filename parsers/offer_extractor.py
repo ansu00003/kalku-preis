@@ -34,11 +34,6 @@ Wenn nicht angegeben und nicht vererbbar, setze "".
   * GP/Betrag steht in der LETZTEN Spalte ("Betrag", "GP", "Gesamtpreis")
   * Kontrolliere: EP x Menge = GP (ungefaehr). Wenn nicht, Spalten verwechselt!
   * Wenn kein EP angegeben, setze 0
-  * EP steht in der VORLETZTEN Preis-Spalte ("E.-Preis", "EP", "Einzelpreis")
-  * GP/Betrag steht in der LETZTEN Spalte ("Betrag", "GP", "Gesamtpreis")
-  * Kontrolliere: EP x Menge = GP (ungefaehr). Wenn nicht, hast du Spalten verwechselt!
-  * Wenn nur EIN Preis sichtbar und Menge > 1: pruefe ob EP oder GP
-  * Wenn kein EP angegeben, setze 0
 - "gp": Gesamtpreis (GP) netto in EUR (wie im Dokument angegeben, 0 wenn nicht angegeben)
 - "rabatt": Rabatt/Skonto in Prozent (z.B. 3 für 3%), 0 wenn nicht angegeben
 - "handschriftlich": true wenn der EP/GP handschriftlich eingetragen wurde, false wenn gedruckt
@@ -51,7 +46,7 @@ Zusätzlich extrahiere Nebenkosten (NUR allgemein gültige Kosten für das gesam
 - "sonstige_nk": Sonstige Nebenkosten (0 wenn nicht angegeben)
 - "logistik_pct": Logistikzuschlag in Prozent (z.B. 4.4 für 4,40%), 0 wenn nicht angegeben
 
-WICHTIG: Extrahiere den FIRMENNAMEN des Lieferanten! Suche im Briefkopf, Logo, Absender, Fusszeile, Stempel, "Firma:" Feld. Setze in "lieferant_name". Wenn nicht erkennbar, setze "".
+WICHTIG: Extrahiere den FIRMENNAMEN des Lieferanten! Suche im Briefkopf, Logo, Absender, Fusszeile. Setze in "lieferant_name".
 WICHTIG: Alle Zahlenwerte MÜSSEN Zahlen sein (nicht null, nicht ""). Wenn unbekannt, setze 0.
 WICHTIG SELBSTKONTROLLE: Pruefe JEDEN Preis: EP x Menge sollte ungefaehr GP ergeben!
 WICHTIG ZAHLENFORMAT: Beachte das DEUTSCHE Zahlenformat — Komma ist DEZIMALTRENNZEICHEN, Punkt ist Tausendertrennzeichen:

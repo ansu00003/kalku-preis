@@ -118,9 +118,10 @@ function addOfferFolder(files) {
             const parts = path.split('/');
 
             // Files in root folder: use folder name as supplier
-            // Files in subfolder: use immediate parent as supplier
 
             // Use immediate parent folder as supplier name
+            // e.g. 04_Angebote/04_Vermessung/Berg/file.pdf → "Berg"
+            // e.g. 04_Angebote/Kohler/file.pdf → "Kohler"
             const supplier = parts.length >= 2
                 ? parts[parts.length - 2].replace(/[_-]+/g, ' ').trim()
                 : 'Unbekannt';
@@ -234,7 +235,7 @@ async function scanDirectoryEntries(entries, parentPath, results) {
         }
     }
 
-    // All PDFs/Excel are already included above
+    // All PDFs already included above
 }
 
 async function scanDirectoryEntriesAll(entries, parentPath, results) {
@@ -443,10 +444,6 @@ function renderMatchResults(data) {
             <div class="stat-value">${warnCount}</div>
             <div class="stat-label">Warnungen</div>
         </div>
-        ${unmatchedCount > 0 ? `<div class="stat-card">
-            <div class="stat-value">${unmatchedCount}</div>
-            <div class="stat-label">Ohne Angebot</div>
-        </div>` : ''}
     `;
 
     renderMatchTable(state.matches);

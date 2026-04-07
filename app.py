@@ -733,30 +733,33 @@ async def run_matching(project_id: str):
     for key, neben in neben_by_key.items():
         if key in best_matches:
             haupt = best_matches[key]
-            lv_pos_check = None
-            for pos in lv_positions:
-                if pos["row"] == key[0]:
-                    lv_pos_check = pos
-                    break
-            if validate_component_addition(haupt, neben, lv_pos_check):
-                components = [
-                    {"name": haupt.get("offer_text", "Hauptmaterial")[:30], "ep": haupt["ep"], "einheit": haupt.get("lv_einheit", "")},
-                    {"name": neben.get("offer_text", "Nebenmaterial")[:30], "ep": neben["ep"], "einheit": neben.get("lv_einheit", "")}
-                ]
-                haupt["components"] = components
-                haupt["ep"] = round(haupt["ep"] + neben["ep"], 2)
-                nt = neben.get("offer_text", "")[:40]
-                ne = neben["ep"]
-                haupt["explanation"] += f" + Neben: {nt} {ne:.2f}"
-                ho = haupt["oz"]
-                all_warnings.append(f"Nebenmaterial addiert: {ho} {nt} {ne:.2f}")
-            else:
-                ho = haupt["oz"]
-                nt = neben.get("offer_text", "")[:40]
-                ne = neben["ep"]
-                all_warnings.append(f"Nebenmaterial NICHT addiert: {ho} {nt} ({ne:.2f})")
+            # Create components array for multi-material position
+            components = [
+                {
+                    "name": haupt.get("offer_text", "Hauptmaterial")[:30],
+                    "ep": haupt["ep"],
+                    "einheit": haupt.get("lv_einheit", "")
+                },
+                {
+                    "name": neben.get("offer_text", "Nebenmaterial")[:30],
+                    "ep": neben["ep"],
+                    "einheit": neben.get("lv_einheit", "")
+                }
+            ]
+            haupt["components"] = components
+            haupt["ep"] = round(haupt["ep"] + neben["ep"], 2)  # Keep total for backward compat
+            haupt["explanation"] += f" + Nebenmaterial ({neben['offer_text'][:40]}): {neben['ep']:.2f}€"
+            all_warnings.append(
+                f"Nebenmaterial addiert: {haupt['oz']} — {neben['offer_text'][:50]} ({neben['supplier']}) "
+                f"{neben['ep']:.2f}€ → Gesamt-EP: {haupt['ep']:.2f}€"
+            )
         else:
-            neben["components"] = [{"name": neben.get("offer_text", "Material")[:30], "ep": neben["ep"], "einheit": neben.get("lv_einheit", "")}]
+            # No Hauptmaterial yet, use Nebenmaterial as-is (single component)
+            neben["components"] = [{
+                "name": neben.get("offer_text", "Material")[:30],
+                "ep": neben["ep"],
+                "einheit": neben.get("lv_einheit", "")
+            }]
             best_matches[key] = neben
 
     # Add components array for single-material positions too
@@ -852,18 +855,13 @@ async def run_matching(project_id: str):
         else:
             src = m.get("match_source", "")
             if "Sch" in src and "tzung" in src:
-                oz = m["oz"]
-                ep = m["ep"]
-                all_warnings.append(f"AI verworfen: {oz} {ep:.2f} - {reason}")
+                all_warnings.append(f"AI verworfen: {m['oz']} {m['ep']:.2f} - {reason}")
                 continue
             w = m.get("warning", "")
             m["warning"] = (w + " | " if w else "") + f"PREIS PRUEFEN: {reason}"
             m["confidence"] = min(m.get("confidence", 100), 25)
             validated.append(m)
-            oz = m["oz"]
-            ep = m["ep"]
-            eu = m.get("lv_einheit", "")
-            all_warnings.append(f"Preis check: {oz} {ep:.2f}/{eu} - {reason}")
+            all_warnings.append(f"Preis check: {m['oz']} {m['ep']:.2f}/{m.get('lv_einheit','')} - {reason}")
     final_matches = validated
 
     final_matches.sort(key=lambda m: m.get("row", 0))

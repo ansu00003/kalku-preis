@@ -23,10 +23,8 @@ REGELN:
   - z.B. "Angebot: DN200, LV verlangt: DN150" oder "Angebot: 8cm Stärke, LV verlangt: 6cm"
 - MATERIALGRUPPEN: Ordne NUR innerhalb gleicher Materialgruppe zu!
   * Betonpflaster != Natursteinpflaster != Klinkerpflaster
-  * KG-Rohr != PE-Rohr != PP-Rohr (verschiedene Materialien!)
-  * Schotter != Kies != Splitt (verschiedene Koernungen!)
+  * KG-Rohr != PE-Rohr != PP-Rohr
   * Granit != Sandstein != Basalt
-  * Betonbord != Granitbord != Natursteinbord
   Verschiedenes Material = KEIN Match!
 - Wenn das Angebot NICHT passt → nicht aufführen
 - Positionen mit "ALTERNATIV:" im Text sind alternative Produktvorschläge. Sie sind KONKURRIERENDE Angebote (Hauptmaterial), NICHT Nebenmaterial! Wenn eine Alternativ-Position das GLEICHE Produkt in anderer Variante ist (z.B. Bogen 30 Grad als Alternative zu Bogen 15 Grad), ordne sie NICHT zu — nur die passende Hauptvariante zuordnen.
@@ -175,7 +173,10 @@ def determine_column(bezeichnung: str) -> str:
         "planum", "verdichten", "planieren",
         "nassschneiden", "schneiden",
         "abbruch", "rückbau", "rodung", "fällung", "baumfällung",
-        # Gutachter / Labor / Dienstleistungen
+        "abbrechen", "aufnehmen", "aufbrechen", "ausbauen", "abtragen",
+        "lösen", "laden", "fördern", "lagern",
+        "baustelleneinrichtung", "vorhalten", "bereithalten", "bereitstellung",
+        "verkehrssicherung", "absperrung", "beschilderung",
         "untersuchung", "probenahme", "beprobung", "laboruntersuchung",
         "gutachten", "gutachter", "sachverständig",
         "verrechnungssatz", "verrechnungsatz", "stundensatz",
