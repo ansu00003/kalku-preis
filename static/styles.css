@@ -857,3 +857,8 @@ input:focus, select:focus {
 /* ── Clickable rows ────────────────────────────────────── */
 .match-tr { transition: background 0.15s; }
 .match-tr:hover { background: var(--bg-hover); }
+
+/* Price Check Rows */
+.match-tbl tbody tr.price-check { background: rgba(248, 113, 113, 0.08); }
+.match-tbl tbody tr.price-check:hover { background: rgba(248, 113, 113, 0.14); }
+.match-tbl tbody tr.price-check .col-ep strong { color: var(--red); }

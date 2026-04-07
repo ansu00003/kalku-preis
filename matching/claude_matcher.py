@@ -14,12 +14,20 @@ Ordne die Angebotspositionen den LV-Positionen zu.
 REGELN:
 - "lv_oz" MUSS EXAKT einer der OZ-Werte aus der LV-Liste unten sein. Verwende GENAU die Schreibweise wie in der Liste (z.B. "1.  10" mit Leerzeichen)!
 - PRÜFE GENAU ob das angebotene Produkt zur LV-Beschreibung UND zum GAEB-Langtext passt:
-  - Vergleiche Material (Stahl vs. Alu, Beton vs. Kunststoff)
+  - Vergleiche Material (Stahl vs. Alu, Beton vs. Kunststoff) — verschiedenes Material = KEIN Match!
+  - KRITISCH: Vergleiche ALLE Spezifikationen — wenn auch nur EINE nicht passt, setze warning!
   - Vergleiche Maße, Nennweiten (DN/NW), Stärken, Abmessungen
   - Vergleiche Typ/Art (z.B. Betonpflaster vs. Natursteinpflaster)
 - Wenn das Angebot ÄHNLICH aber NICHT EXAKT passt (z.B. andere Größe, anderes Material, andere Stärke):
   - Setze match=true ABER schreibe eine WARNING mit der genauen Abweichung
   - z.B. "Angebot: DN200, LV verlangt: DN150" oder "Angebot: 8cm Stärke, LV verlangt: 6cm"
+- MATERIALGRUPPEN: Ordne NUR innerhalb gleicher Materialgruppe zu!
+  * Betonpflaster != Natursteinpflaster != Klinkerpflaster
+  * KG-Rohr != PE-Rohr != PP-Rohr (verschiedene Materialien!)
+  * Schotter != Kies != Splitt (verschiedene Koernungen!)
+  * Granit != Sandstein != Basalt
+  * Betonbord != Granitbord != Natursteinbord
+  Verschiedenes Material = KEIN Match!
 - Wenn das Angebot NICHT passt → nicht aufführen
 - Positionen mit "ALTERNATIV:" im Text sind alternative Produktvorschläge. Sie sind KONKURRIERENDE Angebote (Hauptmaterial), NICHT Nebenmaterial! Wenn eine Alternativ-Position das GLEICHE Produkt in anderer Variante ist (z.B. Bogen 30 Grad als Alternative zu Bogen 15 Grad), ordne sie NICHT zu — nur die passende Hauptvariante zuordnen.
 - Wenn eine LV-Position MEHRERE Materialien braucht (siehe Langtext), ordne ALLE passenden Angebote zu

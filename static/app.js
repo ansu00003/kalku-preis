@@ -420,6 +420,9 @@ function renderMatchResults(data) {
     const stoffeCount = data.by_column?.stoffe_X || 0;
     const nuCount = data.by_column?.nu_M || 0;
     const warnCount = data.warnings?.length || 0;
+    const unmatchedWarn = data.warnings?.find(w => w.includes('ohne Angebotspreis')) || '';
+    const unmatchedMatch = unmatchedWarn.match(/(\d+) Positionen/);
+    const unmatchedCount = unmatchedMatch ? parseInt(unmatchedMatch[1]) : 0;
     document.getElementById('matchStats').innerHTML = `
         <div class="stat-card green">
             <div class="stat-value">${data.total_matches}</div>
@@ -439,6 +442,10 @@ function renderMatchResults(data) {
             <div class="stat-value">${warnCount}</div>
             <div class="stat-label">Warnungen</div>
         </div>
+        ${unmatchedCount > 0 ? `<div class="stat-card">
+            <div class="stat-value">${unmatchedCount}</div>
+            <div class="stat-label">Ohne Angebot</div>
+        </div>` : ''}
     `;
 
     renderMatchTable(state.matches);
@@ -495,7 +502,7 @@ function renderMatchTable(matches, filter = 'all') {
         } else {
             sourceTag = '<span class="source-tag claude">AI</span>';
         }
-        const warningClass = m.warning ? ' has-warning' : '';
+        const warningClass = m.warning ? (m.warning.includes('PREIS PRUEFEN') || m.warning.includes('UNPLAUSIBEL') ? ' has-warning price-check' : ' has-warning') : '';
         const estimatedClass = m.match_source === 'AI-Schätzung' ? ' estimated-row' : '';
         html += `
             <tr class="match-tr${warningClass}${estimatedClass}" title="${(m.explanation || '').replace(/"/g, '&quot;')}" onclick="openEditModal(${globalIdx})" style="cursor:pointer">

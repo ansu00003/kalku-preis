@@ -29,7 +29,12 @@ Wenn nicht angegeben und nicht vererbbar, setze "".
 - "text": Produktbezeichnung/Beschreibung (vollständig!). Wenn die Position als "Alternativ" oder "Alternative" markiert ist, schreibe "ALTERNATIV: " vor die Beschreibung.
 - "menge": Angebotene Menge (Zahl, 0 wenn nicht angegeben)
 - "einheit": Einheit (m, m², m³, t, St, kg, lfm, ps, etc.)
-- "ep": EINZELPREIS (EP) netto in EUR — NUR den Einzelpreis wie er im Dokument steht. NIEMALS den Gesamtpreis hier eintragen. Wenn kein EP angegeben ist, setze 0.
+- "ep": EINZELPREIS (EP) netto in EUR. KRITISCH:
+  * EP steht in der VORLETZTEN Preis-Spalte ("E.-Preis", "EP", "Einzelpreis")
+  * GP/Betrag steht in der LETZTEN Spalte ("Betrag", "GP", "Gesamtpreis")
+  * Kontrolliere: EP x Menge = GP (ungefaehr). Wenn nicht, hast du Spalten verwechselt!
+  * Wenn nur EIN Preis sichtbar und Menge > 1: pruefe ob EP oder GP
+  * Wenn kein EP angegeben, setze 0
 - "gp": Gesamtpreis (GP) netto in EUR (wie im Dokument angegeben, 0 wenn nicht angegeben)
 - "rabatt": Rabatt/Skonto in Prozent (z.B. 3 für 3%), 0 wenn nicht angegeben
 - "handschriftlich": true wenn der EP/GP handschriftlich eingetragen wurde, false wenn gedruckt
@@ -43,6 +48,7 @@ Zusätzlich extrahiere Nebenkosten (NUR allgemein gültige Kosten für das gesam
 - "logistik_pct": Logistikzuschlag in Prozent (z.B. 4.4 für 4,40%), 0 wenn nicht angegeben
 
 WICHTIG: Alle Zahlenwerte MÜSSEN Zahlen sein (nicht null, nicht ""). Wenn unbekannt, setze 0.
+WICHTIG SELBSTKONTROLLE: Pruefe JEDEN Preis: EP x Menge sollte ungefaehr GP ergeben!
 WICHTIG ZAHLENFORMAT: Beachte das DEUTSCHE Zahlenformat — Komma ist DEZIMALTRENNZEICHEN, Punkt ist Tausendertrennzeichen:
   - "2,000 Stück" = 2 Stück (Komma = Dezimaltrenner, drei Nachkommastellen)
   - "1,000 Stück" = 1 Stück
@@ -180,6 +186,39 @@ async def extract_offers_from_text(
                     pos["ep"] = round(corrected_ep, 2)
                     pos["menge"] = round(corrected_menge, 1)
                     print(f"[OFFER_EXTRACT] Fixed scan misread (no GP): {pos.get('text', '')[:40]} — EP {ep}→{pos['ep']}, Menge {menge}→{pos['menge']}")
+
+    # EP/GP Cross-Validation
+    for pos in data.get('positionen', []):
+        _ep = pos.get('ep', 0) or 0
+        _gp = pos.get('gp', 0) or 0
+        _menge = pos.get('menge', 0) or 0
+        _text = pos.get('text', '')[:60]
+        if _ep <= 0 or _menge <= 0: continue
+        if _gp > 0:
+            _expected = _ep * _menge
+            _ratio = _expected / _gp if _gp > 0 else 999
+            if _ratio > 5 and _menge > 1:
+                if abs(_ep - _gp) / max(_gp, 0.01) < 0.05:
+                    _c = round(_ep / _menge, 2)
+                    print(f"[EPGP] Swap: {_text} EP={_ep} ~GP, corrected={_c}")
+                    pos["ep"] = _c
+                    pos["gp"] = _ep
+                else:
+                    _c = round(_gp / _menge, 2)
+                    if _c > 0:
+                        print(f"[EPGP] Fix: {_text} EP*M={_expected:.0f} vs GP={_gp}, EP->{_c}")
+                        pos["ep"] = _c
+        else:
+            _einheit = (pos.get('einheit') or '').lower().strip()
+            _lim = {'m2':300,'m3':400,'m':500,'t':250,'st':5000,'kg':100}
+            _eu = _einheit.replace(chr(178),'2').replace(chr(179),'3')
+            _mx = _lim.get(_eu, 10000)
+            if _ep > _mx and _menge > 1:
+                _c = round(_ep / _menge, 2)
+                if _c < _mx:
+                    print(f"[EPGP] Too high: {_text} {_ep}->{_c}")
+                    pos["gp"] = _ep
+                    pos["ep"] = _c
 
     # Post-process: detect Fracht/Transport/Verpackung positions and move to nebenkosten
     FRACHT_KEYWORDS = ("fracht", "mautanteil", "transport", "lieferkosten", "anlieferung", "zustellung", "spedition")

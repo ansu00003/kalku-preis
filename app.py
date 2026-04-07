@@ -25,6 +25,7 @@ from matching.unit_converter import convert_unit_price, apply_nk_zuschlag
 from matching.price_estimator import estimate_missing_prices, save_learned_price
 from matching.price_database import add_prices_from_offer, add_price
 from matching.rules_engine import load_rules, save_rule, delete_rule, apply_rules
+from matching.price_validator import validate_match, validate_component_addition
 from writer.excel_writer import write_prices_to_lv
 
 app = FastAPI(title="KALKU Preiseintragung", version="1.0.0")
@@ -506,6 +507,19 @@ async def run_matching(project_id: str):
 
     # ── Phase 2: Claude matching for remaining items ──
     gaeb_data = proj.get("gaeb_data")
+
+    # Build GAEB Langtext lookup
+    gaeb_lookup = {}
+    if gaeb_data and gaeb_data.get('positions'):
+        import re as _re
+        for gp in gaeb_data['positions']:
+            _oz = gp.get('oz', '').strip()
+            if _oz:
+                _oz_n = _re.sub(r'\s+', '', _oz.rstrip('.'))
+                _parts = _oz_n.split('.')
+                _oz_n = '.'.join(pp.lstrip('0') or '0' for pp in _parts)
+                gaeb_lookup[_oz_n] = gp.get('langtext', '')
+
     gaeb_count = len(gaeb_data.get("positions", [])) if gaeb_data else 0
     print(f"[MATCH] {len(lv_positions)} LV positions, {len(items_for_claude)} items for Claude, GAEB: {gaeb_count} positions")
 
@@ -715,33 +729,30 @@ async def run_matching(project_id: str):
     for key, neben in neben_by_key.items():
         if key in best_matches:
             haupt = best_matches[key]
-            # Create components array for multi-material position
-            components = [
-                {
-                    "name": haupt.get("offer_text", "Hauptmaterial")[:30],
-                    "ep": haupt["ep"],
-                    "einheit": haupt.get("lv_einheit", "")
-                },
-                {
-                    "name": neben.get("offer_text", "Nebenmaterial")[:30],
-                    "ep": neben["ep"],
-                    "einheit": neben.get("lv_einheit", "")
-                }
-            ]
-            haupt["components"] = components
-            haupt["ep"] = round(haupt["ep"] + neben["ep"], 2)  # Keep total for backward compat
-            haupt["explanation"] += f" + Nebenmaterial ({neben['offer_text'][:40]}): {neben['ep']:.2f}€"
-            all_warnings.append(
-                f"Nebenmaterial addiert: {haupt['oz']} — {neben['offer_text'][:50]} ({neben['supplier']}) "
-                f"{neben['ep']:.2f}€ → Gesamt-EP: {haupt['ep']:.2f}€"
-            )
+            lv_pos_check = None
+            for pos in lv_positions:
+                if pos["row"] == key[0]:
+                    lv_pos_check = pos
+                    break
+            if validate_component_addition(haupt, neben, lv_pos_check):
+                components = [
+                    {"name": haupt.get("offer_text", "Hauptmaterial")[:30], "ep": haupt["ep"], "einheit": haupt.get("lv_einheit", "")},
+                    {"name": neben.get("offer_text", "Nebenmaterial")[:30], "ep": neben["ep"], "einheit": neben.get("lv_einheit", "")}
+                ]
+                haupt["components"] = components
+                haupt["ep"] = round(haupt["ep"] + neben["ep"], 2)
+                nt = neben.get("offer_text", "")[:40]
+                ne = neben["ep"]
+                haupt["explanation"] += f" + Neben: {nt} {ne:.2f}"
+                ho = haupt["oz"]
+                all_warnings.append(f"Nebenmaterial addiert: {ho} {nt} {ne:.2f}")
+            else:
+                ho = haupt["oz"]
+                nt = neben.get("offer_text", "")[:40]
+                ne = neben["ep"]
+                all_warnings.append(f"Nebenmaterial NICHT addiert: {ho} {nt} ({ne:.2f})")
         else:
-            # No Hauptmaterial yet, use Nebenmaterial as-is (single component)
-            neben["components"] = [{
-                "name": neben.get("offer_text", "Material")[:30],
-                "ep": neben["ep"],
-                "einheit": neben.get("lv_einheit", "")
-            }]
+            neben["components"] = [{"name": neben.get("offer_text", "Material")[:30], "ep": neben["ep"], "einheit": neben.get("lv_einheit", "")}]
             best_matches[key] = neben
 
     # Add components array for single-material positions too
@@ -828,6 +839,29 @@ async def run_matching(project_id: str):
     final_matches = apply_rules(final_matches, lv_positions)
 
     # ── Sort by row (LV order) ──
+    # Plausibility validation
+    validated = []
+    for m in final_matches:
+        ok, reason = validate_match(m)
+        if ok:
+            validated.append(m)
+        else:
+            src = m.get("match_source", "")
+            if "Sch" in src and "tzung" in src:
+                oz = m["oz"]
+                ep = m["ep"]
+                all_warnings.append(f"AI verworfen: {oz} {ep:.2f} - {reason}")
+                continue
+            w = m.get("warning", "")
+            m["warning"] = (w + " | " if w else "") + f"PREIS PRUEFEN: {reason}"
+            m["confidence"] = min(m.get("confidence", 100), 25)
+            validated.append(m)
+            oz = m["oz"]
+            ep = m["ep"]
+            eu = m.get("lv_einheit", "")
+            all_warnings.append(f"Preis check: {oz} {ep:.2f}/{eu} - {reason}")
+    final_matches = validated
+
     final_matches.sort(key=lambda m: m.get("row", 0))
 
     proj["matches"] = final_matches

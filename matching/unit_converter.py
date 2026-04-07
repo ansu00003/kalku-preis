@@ -1,11 +1,14 @@
-"""Unit conversion for construction materials."""
+"""Unit conversion for construction materials.
+
+KEY FIX: Added volume→area conversion using layer thickness extracted from LV description.
+e.g., "Schotter einbauen d=20cm" → thickness=0.20m → t-price × density × 0.20 = m²-price
+"""
 import re
 import json
 from pathlib import Path
 from typing import Optional, Tuple
 import config
 
-# Learned conversions cache file
 _CACHE_FILE = Path(__file__).parent.parent / "learned_conversions.json"
 _learned_cache = {}
 
@@ -47,7 +50,49 @@ def convert_unit_price(
     if from_u == to_u:
         return ep, f"{ep:.2f} €/{to_unit} (gleiche Einheit)"
 
-    # Try direct conversion
+    # ── NEW: Volume/Weight → Area conversion (t→m², m³→m²) ──
+    # Requires layer thickness from the LV description
+    if to_u == "m²" and from_u in ("t", "m³"):
+        thickness = _extract_thickness(material_hint)
+        if thickness and thickness > 0:
+            if from_u == "t":
+                density = _guess_density(material_hint.lower())
+                if density:
+                    # t → m³ → m²
+                    # EP/t × (1/density) = EP/m³
+                    # EP/m³ × thickness = EP/m²
+                    ep_per_m3 = ep / density
+                    ep_per_m2 = ep_per_m3 * thickness
+                    converted = round(ep_per_m2, 2)
+                    explanation = (f"{ep:.2f}€/t ÷ {density}t/m³ = {ep_per_m3:.2f}€/m³ "
+                                   f"× {thickness}m Stärke = {converted:.2f}€/m²")
+                    return converted, explanation
+            elif from_u == "m³":
+                # m³ → m²: EP/m³ × thickness = EP/m²
+                ep_per_m2 = ep * thickness
+                converted = round(ep_per_m2, 2)
+                explanation = f"{ep:.2f}€/m³ × {thickness}m Stärke = {converted:.2f}€/m²"
+                return converted, explanation
+
+    # ── NEW: Area → Volume/Weight (m²→t, m²→m³) — reverse ──
+    if from_u == "m²" and to_u in ("t", "m³"):
+        thickness = _extract_thickness(material_hint)
+        if thickness and thickness > 0:
+            if to_u == "m³":
+                ep_per_m3 = ep / thickness
+                converted = round(ep_per_m3, 2)
+                explanation = f"{ep:.2f}€/m² ÷ {thickness}m = {converted:.2f}€/m³"
+                return converted, explanation
+            elif to_u == "t":
+                density = _guess_density(material_hint.lower())
+                if density:
+                    ep_per_m3 = ep / thickness
+                    ep_per_t = ep_per_m3 * density
+                    converted = round(ep_per_t, 2)
+                    explanation = f"{ep:.2f}€/m² ÷ {thickness}m × {density}t/m³ = {converted:.2f}€/t"
+                    return converted, explanation
+
+    # ── Standard conversions ──
     factor = _get_conversion_factor(from_u, to_u, material_hint)
     if factor:
         converted = round(ep * factor, 2)
@@ -72,7 +117,6 @@ def convert_unit_price(
     # Ask Claude for unknown conversions
     factor = _ask_claude_conversion(from_u, to_u, material_hint)
     if factor:
-        # Save to cache so we never ask again
         _learned_cache[key] = factor
         _save_cache()
         converted = round(ep * factor, 2)
@@ -80,6 +124,47 @@ def convert_unit_price(
         return converted, explanation
 
     return None, f"Keine Umrechnung möglich: {from_unit} → {to_unit}"
+
+
+def _extract_thickness(text: str) -> Optional[float]:
+    """Extract layer thickness from LV description.
+
+    Looks for patterns like:
+    - "d=20cm", "d 20 cm", "Stärke 20 cm"
+    - "20 cm stark", "d=0,20m"
+    - "d bis 20 cm", "d 15-20 cm" (takes the larger value)
+
+    Returns thickness in METERS (0.20 for 20cm).
+    """
+    if not text:
+        return None
+
+    text_lower = text.lower()
+
+    # Pattern 1: "d=20cm", "d 20cm", "d=0,20m", "d bis 20 cm", "d 15-20 cm"
+    patterns = [
+        # "d=20 cm" or "d 20cm" or "d=0,20 m"
+        r'd\s*[=:]\s*(?:\d+[\-–]\s*)?(\d+(?:[.,]\d+)?)\s*(cm|m)\b',
+        r'\bd\s+(?:bis\s+)?(?:\d+[\-–]\s*)?(\d+(?:[.,]\d+)?)\s*(cm|m)\b',
+        # "Stärke 20 cm", "Dicke 0,20m"
+        r'(?:stärke|dicke|schichtdicke|schichtstärke)\s*(?:ca\.?\s*)?(?:\d+[\-–]\s*)?(\d+(?:[.,]\d+)?)\s*(cm|m)\b',
+        # "20 cm stark", "20cm dick"
+        r'(\d+(?:[.,]\d+)?)\s*(cm|m)\s+(?:stark|dick)\b',
+        # "d bis 20 cm" pattern with range
+        r'd\s+(?:bis\s+)?(\d+(?:[.,]\d+)?)\s*(cm|m)',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            value = float(match.group(1).replace(',', '.'))
+            unit = match.group(2)
+            if unit == "cm":
+                return value / 100  # cm → m
+            else:
+                return value  # already in m
+
+    return None
 
 
 async def _ask_claude_conversion_async(from_u: str, to_u: str, material_hint: str) -> Optional[float]:
@@ -101,7 +186,6 @@ async def _ask_claude_conversion_async(from_u: str, to_u: str, material_hint: st
             )}],
         )
         text = response.content[0].text.strip()
-        # Extract number from response
         match = re.search(r'[\d]+[.,]?[\d]*', text)
         if match:
             return float(match.group().replace(',', '.'))
@@ -111,7 +195,7 @@ async def _ask_claude_conversion_async(from_u: str, to_u: str, material_hint: st
 
 
 def _ask_claude_conversion(from_u: str, to_u: str, material_hint: str) -> Optional[float]:
-    """Sync wrapper — runs the async version in a new event loop."""
+    """Sync wrapper."""
     import asyncio
     try:
         loop = asyncio.get_running_loop()
@@ -125,7 +209,6 @@ def _ask_claude_conversion(from_u: str, to_u: str, material_hint: str) -> Option
 
 
 def _normalize_unit(unit: str) -> str:
-    """Normalize unit strings."""
     u = unit.lower().strip().replace(".", "")
     mapping = {
         "m2": "m²", "m3": "m³", "qm": "m²", "cbm": "m³",
@@ -140,42 +223,31 @@ def _normalize_unit(unit: str) -> str:
 
 
 def _get_conversion_factor(from_u: str, to_u: str, material_hint: str) -> Optional[float]:
-    """Get conversion factor. Returns multiplier to go from_u → to_u."""
     hint = material_hint.lower()
-    
-    # Volume ↔ Weight (using density)
+
     if from_u == "t" and to_u == "m³":
         density = _guess_density(hint)
         if density:
-            return 1.0 / density  # t → m³: divide by density
-    
+            return 1.0 / density
+
     if from_u == "m³" and to_u == "t":
         density = _guess_density(hint)
         if density:
-            return density  # m³ → t: multiply by density
-    
-    # kg ↔ t
+            return density
+
     if from_u == "kg" and to_u == "t":
         return 0.001
     if from_u == "t" and to_u == "kg":
         return 1000.0
-    
-    # m ↔ m (linear, just check names)
-    # m² ↔ m² already caught by same-unit check
-    
-    # Sack → m² (for seeds, etc.)
-    # This requires specific knowledge, return None to trigger Claude
-    
+
     return None
 
 
 def _guess_density(hint: str) -> Optional[float]:
-    """Guess material density from description text."""
     for keyword, density in config.DENSITY.items():
         if keyword in hint:
             return density
-    
-    # Broader matching
+
     if any(k in hint for k in ("schotter", "mineralgem", "mineralgemisch")):
         return 1.82
     if any(k in hint for k in ("kies", "kiessand")):
@@ -188,18 +260,13 @@ def _guess_density(hint: str) -> Optional[float]:
         return 1.45
     if any(k in hint for k in ("beton", "zement")):
         return 2.35
-    
+
     return None
 
 
 def apply_nk_zuschlag(ep: float, zuschlag_pct: float) -> Tuple[float, str]:
-    """Apply Nebenkosten percentage to unit price.
-    
-    Returns: (new_ep, explanation)
-    """
     if zuschlag_pct <= 0:
         return ep, f"{ep:.2f} €"
-    
     new_ep = round(ep * (1 + zuschlag_pct / 100), 2)
     explanation = f"{ep:.2f} € + {zuschlag_pct:.1f}% NK = {new_ep:.2f} €"
     return new_ep, explanation
