@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KALKU — Preiseintragung</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar -->
+        <aside id="sidebar">
+            <div class="logo">
+                <span class="logo-mark">K</span>
+                <span class="logo-text">KALKU</span>
+            </div>
+            <nav id="steps">
+                <a class="step active" data-step="1" onclick="goStep(1)">
+                    <span class="step-num">01</span>
+                    <span class="step-label">Projekt</span>
+                </a>
+                <a class="step" data-step="2" onclick="goStep(2)">
+                    <span class="step-num">02</span>
+                    <span class="step-label">Dateien</span>
+                </a>
+                <a class="step" data-step="3" onclick="goStep(3)">
+                    <span class="step-num">03</span>
+                    <span class="step-label">Matching</span>
+                </a>
+                <a class="step" data-step="4" onclick="goStep(4)">
+                    <span class="step-num">04</span>
+                    <span class="step-label">Ergebnis</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="btn btn-outline btn-sm" onclick="openRulesModal()" style="width:100%;margin-bottom:0.5rem">Regeln</button>
+                <div class="api-status" id="apiStatus">
+                    <span class="dot"></span>
+                    <span>API Key prüfen…</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main id="content">
+            <!-- Step 1: Project -->
+            <section class="panel" id="panel-1">
+                <div class="panel-header">
+                    <h1>Neues Projekt</h1>
+                    <p class="subtitle">Erstelle ein Projekt für die Preiseintragung</p>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label for="projectName">Projektname</label>
+                        <input type="text" id="projectName" placeholder="z.B. GS Güdingen Außenanlagen 2026" autofocus>
+                    </div>
+                    <button class="btn btn-primary" onclick="createProject()">
+                        Projekt erstellen →
+                    </button>
+                </div>
+            </section>
+
+            <!-- Step 2: All Files Upload -->
+            <section class="panel hidden" id="panel-2">
+                <div class="panel-header">
+                    <h1>Dateien hochladen</h1>
+                    <p class="subtitle">LV, GAEB und Angebote — alles auf einmal</p>
+                </div>
+                <div class="panel-body">
+                    <!-- LV -->
+                    <div class="upload-zone" id="lvDropZone" ondrop="handleLvDrop(event)" ondragover="event.preventDefault()">
+                        <div class="upload-icon">📊</div>
+                        <p>LV-Excel hier ablegen oder</p>
+                        <label class="btn btn-outline">
+                            LV wählen (.xlsx)
+                            <input type="file" accept=".xlsx,.xls" onchange="addLvFile(this.files[0])" hidden>
+                        </label>
+                        <p class="upload-hint">.xlsx mit "Kalkulation"-Sheet</p>
+                    </div>
+                    <div id="lvFileInfo" class="hidden"></div>
+                    <div class="form-group" style="margin-top:1rem">
+                        <label for="sheetName">Sheet-Name</label>
+                        <input type="text" id="sheetName" value="Kalkulation" placeholder="Kalkulation">
+                    </div>
+
+                    <!-- Optional GAEB -->
+                    <div class="section-divider">
+                        <span>Optional: GAEB-Langtext</span>
+                    </div>
+                    <div class="upload-zone upload-zone-small" ondrop="handleGaebDrop(event)" ondragover="event.preventDefault()">
+                        <label class="btn btn-outline btn-sm">
+                            GAEB hochladen (.x83/.d83)
+                            <input type="file" accept=".x83,.x84,.d83,.p83" onchange="addGaebFile(this.files[0])" hidden>
+                        </label>
+                    </div>
+                    <div id="gaebFileInfo" class="hidden"></div>
+
+                    <!-- Offers -->
+                    <div class="section-divider">
+                        <span>Angebote (Ordner oder einzelne Dateien)</span>
+                    </div>
+                    <div class="upload-zone" id="offersDropZone" ondrop="handleOffersDrop(event)" ondragover="event.preventDefault()">
+                        <div class="upload-icon">📄</div>
+                        <p>Angebots-Ordner hier ablegen oder</p>
+                        <label class="btn btn-outline">
+                            Ordner wählen (z.B. 04_Angebote)
+                            <input type="file" webkitdirectory directory onchange="addOfferFolder(this.files)" hidden>
+                        </label>
+                        <label class="btn btn-outline btn-sm" style="margin-left:0.5rem">
+                            Einzelne Dateien
+                            <input type="file" accept=".pdf,.xlsx,.xls" multiple onchange="addOfferFiles(this.files)" hidden>
+                        </label>
+                        <p class="upload-hint">Findet automatisch Angebot_*.pdf in Unterordnern (Ordnername = Lieferant)</p>
+                    </div>
+                    <div id="offerFilesList" class="offers-list"></div>
+
+                    <!-- Process button -->
+                    <button class="btn btn-primary btn-lg" id="btnProcess" onclick="uploadAndProcess()" disabled style="margin-top:1.5rem">
+                        Hochladen & Verarbeiten
+                    </button>
+
+                    <!-- Results after processing -->
+                    <div id="processResults" class="hidden">
+                        <div class="stat-grid" id="lvStats"></div>
+                        <div id="gaebInfo" class="hidden"></div>
+                        <div id="offersList" class="offers-list"></div>
+                        <button class="btn btn-primary btn-lg" onclick="runMatching()" style="margin-top:1.5rem">
+                            Matching starten
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 3: Matching Results -->
+            <section class="panel hidden" id="panel-3">
+                <div class="panel-header">
+                    <h1>Zuordnung prüfen</h1>
+                    <p class="subtitle" id="matchSummary">Matching läuft…</p>
+                </div>
+                <div class="panel-body">
+                    <div id="matchProgress" class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    
+                    <div id="matchResults" class="hidden">
+                        <div class="stat-grid" id="matchStats"></div>
+                        
+                        <div class="match-filters">
+                            <button class="filter-btn active" onclick="filterMatches('all')">Alle</button>
+                            <button class="filter-btn" onclick="filterMatches('X')">Stoffe (X)</button>
+                            <button class="filter-btn" onclick="filterMatches('M')">NU (M)</button>
+                            <button class="filter-btn" onclick="filterMatches('estimated')">Geschätzt</button>
+                            <button class="filter-btn" onclick="filterMatches('warning')">Warnungen</button>
+                        </div>
+                        
+                        <div id="matchTable" class="match-table"></div>
+                        
+                        <div id="warnings" class="warnings-box hidden"></div>
+                        
+                        <button class="btn btn-primary btn-lg" onclick="writeToExcel()">
+                            ✅ In Excel eintragen & Download
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 4: Result -->
+            <section class="panel hidden" id="panel-4">
+                <div class="panel-header">
+                    <h1>Ergebnis</h1>
+                    <p class="subtitle">Preiseintragung abgeschlossen</p>
+                </div>
+                <div class="panel-body">
+                    <div id="reportContent"></div>
+                    <div class="download-section">
+                        <a id="downloadLink" class="btn btn-primary btn-lg" href="#" download>
+                            📥 Excel herunterladen
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Loading Overlay -->
+            <div id="loadingOverlay" class="loading-overlay hidden">
+                <div class="loader">
+                    <div class="loader-spinner"></div>
+                    <p id="loadingText">Verarbeite…</p>
+                    <div id="loadingProgressBar" class="loading-progress-bar hidden">
+                        <div id="loadingProgressFill" class="loading-progress-fill"></div>
+                    </div>
+                    <p id="loadingProgressPct" class="loading-progress-pct hidden">0%</p>
+                    <p id="loadingProgressStep" class="loading-progress-step hidden"></p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit Price Modal -->
+    <div id="editModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Preis bearbeiten</h2>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="edit-info">
+                    <code id="editOz"></code>
+                    <span id="editBez"></span>
+                </div>
+                <div class="form-group">
+                    <label>Neuer EP (netto)</label>
+                    <div class="input-with-unit">
+                        <input type="number" id="editEp" step="0.01" min="0">
+                        <span id="editUnit" class="input-unit"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Spalte</label>
+                    <select id="editColumn">
+                        <option value="X">Stoffe (X)</option>
+                        <option value="M">Nachunternehmer (M)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Warum wurde der Preis geändert?</label>
+                    <textarea id="editReason" rows="2" placeholder="z.B. Preis aus altem Projekt übernommen, Lieferant hat telefonisch bestätigt…"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="editSaveRule">
+                        Als dauerhafte Regel speichern (wird bei zukünftigen Projekten angewandt)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeEditModal()">Abbrechen</button>
+                <button class="btn btn-primary" onclick="saveEdit()">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rules Modal -->
+    <div id="rulesModal" class="modal hidden">
+        <div class="modal-content modal-wide">
+            <div class="modal-header">
+                <h2>Gespeicherte Regeln</h2>
+                <button class="modal-close" onclick="closeRulesModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="subtitle">Diese Regeln werden automatisch bei jedem Matching angewandt.</p>
+                <div id="rulesList" class="rules-list"></div>
+                <div id="rulesEmpty" class="rules-empty">Keine Regeln gespeichert.</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeRulesModal()">Schließen</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js?v=3"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+[
+  {
+    "type": "price_override",
+    "oz": "01.03.01",
+    "bezeichnung": "Abnahme Spielgeräte,\nErstinspektion nach DIN EN 1176",
+    "ep": 1200.0,
+    "old_ep": 1411200.0,
+    "column": "M",
+    "description": "preis ist imemer gleich",
+    "created": "2026-04-01T19:46:28.863456",
+    "id": 1
+  }
+]
