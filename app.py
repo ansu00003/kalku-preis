@@ -347,6 +347,8 @@ async def run_matching(project_id: str):
 
     for i, item in enumerate(all_offer_items):
         lv_pos_nr = (item.get("lv_pos_nr") or "").strip()
+        # Strip ff./alter./alternativ suffixes from LV-POS-NR
+        lv_pos_nr = re.sub(r'\s*(ff\.?|alter\.?|alternativ)\s*$', '', lv_pos_nr, flags=re.IGNORECASE).strip()
         if lv_pos_nr:
             lv_pos = _find_lv_position(lv_pos_nr, oz_lookup)
             if lv_pos:
@@ -370,6 +372,28 @@ async def run_matching(project_id: str):
         # NK is per-offer, get from first item's filename
         _offer_fn = group["items"][0].get("_offer_filename", "") if group["items"] else ""
         nk_pct = offer_nk.get(_offer_fn, 0)
+
+        # ── Filter Alternativpositionen ──
+        main_items = []
+        alt_items = []
+        for item in group["items"]:
+            item_text = (item.get("text") or "").lower()
+            if "alternativ" in item_text:
+                alt_items.append(item)
+            else:
+                main_items.append(item)
+        if main_items:
+            group["items"] = main_items
+            if alt_items:
+                alt_eps = [float(a.get("ep", 0) or 0) for a in alt_items if float(a.get("ep", 0) or 0) > 0]
+                main_eps = [float(m.get("ep", 0) or 0) for m in main_items if float(m.get("ep", 0) or 0) > 0]
+                if alt_eps and main_eps and min(alt_eps) < min(main_eps):
+                    all_warnings.append(
+                        f"Alternativposition günstiger: {lv_pos['oz']} — Haupt {min(main_eps):.2f}€, "
+                        f"Alternative {min(alt_eps):.2f}€ (z.B. längere Baulänge)")
+        elif alt_items:
+            alt_items.sort(key=lambda x: float(x.get("ep", 0) or 0))
+            group["items"] = [alt_items[0]]
 
         # Deduplicate items: same EP + same unit + similar text = duplicate from repeated PDF pages
         seen = set()
@@ -781,61 +805,103 @@ async def run_matching(project_id: str):
     final_matches = list(best_matches.values())
     matched_rows = {m["row"] for m in final_matches}
 
-    # ── Phase 3: AI Price Estimation for unmatched material positions ──
-    # Identify material positions with no match
+    # ── Phase 3: AI Price Estimation for unmatched positions ──
     WORK_KEYWORDS = (
-        "erstellen", "verdichten", "herstellen", "einbauen und verdichten",
-        "nassschneiden", "schneiden", "planum", "abbruch", "rückbau",
-        "abfuhr", "entsorg", "rodung", "fällung",
-        "baustelleneinrichtung", "vorhalten", "bereithalten",
-        "baustelle einrichten", "baustelle räumen",
-        "verkehrssicherung", "absperrung", "beschilderung",
+        "erstellen", "verdichten", "herstellen",
+        "nassschneiden", "schneiden", "planum",
+        "abbruch", "rückbau", "abfuhr", "entsorg", "rodung", "fällung",
         "abbrechen", "aufnehmen", "aufbrechen", "ausbauen", "abtragen",
         "lösen", "laden", "fördern", "lagern",
         "planieren", "profilieren", "begradigen",
-        "verdichtungsprüfung", "kontrollprüfung",
     )
+    _MAT_NAMES = (
+        "sand", "kies", "schotter", "splitt", "boden", "beton",
+        "verfüllung", "bettung", "substrat", "frostschutz",
+        "oberboden", "mutterboden", "tragschicht", "schicht",
+        "rohr", "folie", "pflaster", "bordstein", "rinne",
+        "liefer", "material", "mulch", "hackschnitzel",
+        "kanal", "abwasser", "schacht", "dichtung", "muffe",
+        "formstück", "bogen", "abzweig", "reduktion", "deckel",
+        "rost", "gitter", "vlies", "geotextil", "drainage",
+        "bewässerung", "zaun", "pfosten", "geländer", "gabione",
+        "l-stein", "winkelstütz", "betonplatte", "rasengitter",
+        "asphalt", "bitumen", "mischgut", "bindemittel",
+        "baum", "strauch", "hecke", "staude", "rasen", "saatgut",
+        "wurzelschutz", "stammschutz", "verankerung", "substrat",
+    )
+    _NU_ESTIMATE = (
+        "dichtheitsprüfung", "dichtheitspr", "inspektion",
+        "tv-befahrung", "kamerabefahrung", "kontrollprüfung",
+        "druckprüfung", "dokumentation", "vermessung",
+        "gutachten", "abnahme", "protokoll",
+        "baustelleneinrichtung", "verkehrssicherung",
+        "absperrung", "beschilderung", "vorhalten", "bereithalten",
+        "verrechnungssatz", "verrechnungsatz", "stundensatz",
+        "projektleitung", "bauüberwachung", "baubegleitung",
+        "kampfmittel", "probenahme", "beprobung", "laboruntersuchung",
+    )
+    _BAUSEITS = ("bauseits", "beigestellt", "vom ag ", "vom auftraggeber",
+                 "ag-seitig", "wird gestellt", "material vorhanden")
+
     unmatched_material = []
+    unmatched_nu = []
     for pos in lv_positions:
         if pos["row"] in matched_rows:
-            continue
-        bez_lower = pos["bezeichnung"].lower()
-        # Skip pure work/labor positions
-        is_work = any(kw in bez_lower for kw in WORK_KEYWORDS)
-        # But keep "liefern und einbauen" (has material component)
-        _MAT_NAMES = ("sand", "kies", "schotter", "splitt", "boden",
-                      "beton", "verfüllung", "bettung", "substrat",
-                      "frostschutz", "oberboden", "mutterboden",
-                      "tragschicht", "schicht", "rohr", "folie",
-                      "pflaster", "bordstein", "rinne", "liefer",
-                      "material", "mulch", "hackschnitzel")
-        if any(mk in bez_lower for mk in _MAT_NAMES):
-            is_work = False
-        if is_work:
             continue
         # Skip group headers (no unit/menge)
         if not pos.get("einheit") or not pos.get("menge"):
             continue
+        bez_lower = pos["bezeichnung"].lower()
+
+        # Check GAEB Langtext for bauseits
+        _is_bauseits = False
+        if gaeb_data and gaeb_data.get("positions"):
+            _oz_c = _normalize_oz(pos["oz"])
+            for _gp in gaeb_data["positions"]:
+                _gpoz = _normalize_oz(_gp.get("oz", ""))
+                if _gpoz == _oz_c:
+                    _lt = (_gp.get("langtext", "") or "").lower()
+                    if any(bs in _lt for bs in _BAUSEITS):
+                        _is_bauseits = True
+                        all_warnings.append(f"Material bauseits: {pos['oz']} — kein Preis")
+                    break
+        if _is_bauseits:
+            continue
+
+        # NU service positions → estimate separately
+        if any(kw in bez_lower for kw in _NU_ESTIMATE):
+            pos["_is_nu"] = True
+            unmatched_nu.append(pos)
+            continue
+
+        # Skip pure work (no material name)
+        is_work = any(kw in bez_lower for kw in WORK_KEYWORDS)
+        if is_work and any(mk in bez_lower for mk in _MAT_NAMES):
+            is_work = False  # Has material → keep
+        if is_work:
+            continue
+
         unmatched_material.append(pos)
 
-    if unmatched_material:
-        proj["progress"] = {"pct": 80, "step": f"AI Preisschätzung für {len(unmatched_material)} fehlende Positionen…"}
+    all_unmatched = unmatched_material + unmatched_nu
+
+    if all_unmatched:
+        proj["progress"] = {"pct": 80, "step": f"AI Preisschätzung für {len(all_unmatched)} fehlende Positionen…"}
         await asyncio.sleep(0)
         try:
-            # Add price range hints to positions for the AI prompt
-            for pos in unmatched_material:
+            # Add price range hints
+            for pos in all_unmatched:
                 pr = get_price_range(pos["bezeichnung"])
                 if pr:
                     pos["_price_hint"] = f"Preisbereich: {pr[0]:.2f}-{pr[1]:.2f} €/{pos.get('einheit', '')} ({pr[2]})"
 
-            estimates = await estimate_missing_prices(unmatched_material, gaeb_data)
+            estimates = await estimate_missing_prices(all_unmatched, gaeb_data)
             for est in estimates:
                 if est.get("skip", False):
                     continue
                 est_ep = float(est.get("ep", 0) or 0)
-                # Find matching LV position
                 target_pos = None
-                for pos in unmatched_material:
+                for pos in all_unmatched:
                     if pos["oz"] == est.get("oz"):
                         target_pos = pos
                         break
@@ -853,7 +919,11 @@ async def run_matching(project_id: str):
                         all_warnings.append(f"AI-Schätzung zu hoch: {target_pos['oz']} {est_ep:.2f}€ → korrigiert auf {max_p:.2f}€ ({key})")
                         est_ep = max_p
 
-                column = determine_column(target_pos["bezeichnung"])
+                # Respect NU flag
+                if target_pos.get("_is_nu"):
+                    column = "M"
+                else:
+                    column = determine_column(target_pos["bezeichnung"])
                 final_matches.append({
                     "row": target_pos["row"],
                     "oz": target_pos["oz"],
