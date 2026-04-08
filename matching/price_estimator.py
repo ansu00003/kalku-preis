@@ -283,7 +283,7 @@ Für reine Arbeitspositionen (ohne Material):
 Antworte NUR mit validem JSON-Array:"""
 
 
-async def estimate_missing_prices(positions: list, gaeb_data: dict = None) -> list:
+async def estimate_missing_prices(positions: list, gaeb_data: dict = None, project_plz: str = "") -> list:
     """Estimate prices for LV positions without offer matches.
 
     Uses three sources:
@@ -319,7 +319,7 @@ async def estimate_missing_prices(positions: list, gaeb_data: dict = None) -> li
             continue
 
         # ── Step 2: Check price database (scraped + offer prices) ──
-        db_matches = find_price(p["bezeichnung"], p.get("einheit", ""))
+        db_matches = find_price(p["bezeichnung"], p.get("einheit", ""), project_plz=project_plz)
         if db_matches:
             best = db_matches[0]
             results.append({

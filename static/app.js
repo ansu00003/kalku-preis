@@ -804,3 +804,80 @@ function updateSupplier(index, name) {
         state.offerFiles[index].supplier = name.trim() || 'Unbekannt';
     }
 }
+
+
+/* ── Preisvergleich Report ──────────────────────────────── */
+async function showPreisvergleich() {
+    showLoading('Preisvergleich wird erstellt…');
+    try {
+        const res = await fetch(`/api/project/${state.projectId}/preisvergleich`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Fehler');
+
+        let html = `<div style="max-height:75vh;overflow-y:auto;padding:1rem">`;
+
+        // Summary
+        html += `<div class="stat-grid">
+            <div class="stat-card green"><div class="stat-value">${data.total_positions}</div><div class="stat-label">Positionen</div></div>
+            <div class="stat-card"><div class="stat-value">${data.suppliers.length}</div><div class="stat-label">Lieferanten</div></div>
+            <div class="stat-card orange"><div class="stat-value">${data.total_savings_potential.toLocaleString('de-DE',{maximumFractionDigits:0})}€</div><div class="stat-label">Einsparpotential</div></div>
+        </div>`;
+
+        // Supplier ranking
+        html += `<h3 style="margin:1.2rem 0 0.5rem;font-size:0.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">Lieferanten-Ranking</h3>`;
+        for (const s of data.suppliers) {
+            const pct = data.total_positions > 0 ? Math.round(s.wins / data.total_positions * 100) : 0;
+            html += `<div class="offer-card" style="margin-bottom:0.3rem">
+                <div class="offer-info"><span class="offer-filename">${s.name}</span>
+                <span class="offer-meta">${s.total_offered} angeboten · ${s.wins}× günstigster (${pct}%)</span></div>
+                <span class="offer-status ok">${s.total_value.toLocaleString('de-DE',{maximumFractionDigits:0})}€</span>
+            </div>`;
+        }
+
+        // Top savings
+        if (data.top_savings.length > 0) {
+            html += `<h3 style="margin:1.2rem 0 0.5rem;font-size:0.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">Größte Einsparpotentiale</h3>`;
+            for (const s of data.top_savings.slice(0, 10)) {
+                html += `<div style="display:flex;justify-content:space-between;padding:0.35rem 0;font-size:0.85rem;border-bottom:1px solid var(--border)">
+                    <span><code style="color:var(--accent)">${s.oz}</code> ${s.bezeichnung}</span>
+                    <span style="font-family:var(--mono);color:var(--accent);font-weight:600;white-space:nowrap">${s.cheapest}: ${s.cheapest_ep.toFixed(2)}€ vs ${s.expensive}: ${s.expensive_ep.toFixed(2)}€ → <strong>${s.saving_total.toFixed(0)}€</strong></span>
+                </div>`;
+            }
+        }
+
+        // Detail table
+        const allSuppliers = data.suppliers.map(s => s.name);
+        if (allSuppliers.length > 0) {
+            html += `<h3 style="margin:1.2rem 0 0.5rem;font-size:0.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">Alle Positionen</h3>`;
+            html += `<div style="overflow-x:auto"><table class="match-tbl"><thead><tr><th>OZ</th><th>Bezeichnung</th><th>Einheit</th>`;
+            for (const s of allSuppliers) html += `<th style="text-align:right;font-size:0.6rem;max-width:80px;overflow:hidden">${s.substring(0,15)}</th>`;
+            html += `</tr></thead><tbody>`;
+            for (const pos of data.positions) {
+                html += `<tr><td><code>${pos.oz}</code></td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pos.bezeichnung}</td><td style="font-size:0.75rem">${pos.einheit}</td>`;
+                for (const s of allSuppliers) {
+                    const offer = pos.suppliers[s];
+                    if (offer) {
+                        const isBest = pos.best_supplier === s;
+                        html += `<td style="text-align:right;font-family:var(--mono);font-size:0.8rem;${isBest ? 'color:var(--accent);font-weight:700' : 'color:var(--text-muted)'}">${offer.ep.toFixed(2)}</td>`;
+                    } else {
+                        html += `<td style="text-align:right;color:var(--text-dim);font-size:0.75rem">—</td>`;
+                    }
+                }
+                html += `</tr>`;
+            }
+            html += `</tbody></table></div>`;
+        }
+
+        html += `</div>`;
+
+        // Show in modal (reuse rules modal)
+        const modal = document.getElementById('rulesModal');
+        modal.querySelector('.modal-header h2').textContent = '📊 Preisvergleich Report';
+        modal.querySelector('.modal-body').innerHTML = html;
+        modal.querySelector('.modal-content').classList.add('modal-wide');
+        modal.classList.remove('hidden');
+    } catch(e) {
+        alert('Fehler: ' + e.message);
+    }
+    hideLoading();
+}

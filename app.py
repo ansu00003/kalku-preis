@@ -251,7 +251,14 @@ async def process_files(project_id: str):
         # Save offer prices to database for future reuse
         supplier = offer_data.get("supplier", "Unbekannt")
         if items:
-            add_prices_from_offer(items, supplier)
+            # Pass full PDF text so PLZ/region can be extracted
+            _offer_text = ""
+            for _pg in offer_data.get("_pages", []):
+                _offer_text += _pg.get("text", "")
+            if not _offer_text:
+                # Fallback: reconstruct from item texts
+                _offer_text = " ".join(it.get("text", "") for it in items)
+            add_prices_from_offer(items, supplier, _offer_text)
         results["offers"].append({
             "filename": offer_data["filename"],
             "supplier": supplier,
@@ -986,6 +993,150 @@ async def run_matching(project_id: str):
         },
         "warnings": all_warnings,
         "matches": final_matches,
+    }
+
+
+
+
+# ─── Preisvergleich Report ─────────────────────────────────────────────────
+
+@app.get("/api/project/{project_id}/preisvergleich")
+async def get_preisvergleich(project_id: str):
+    """Generate price comparison report: all suppliers side-by-side per LV position."""
+    if project_id not in projects:
+        raise HTTPException(404, "Project not found")
+
+    proj = projects[project_id]
+    if not proj.get("lv_data") or not proj.get("offers"):
+        raise HTTPException(400, "No LV or offers loaded")
+
+    lv_positions = proj["lv_data"]["positions"]
+    all_matches = proj.get("matches", [])
+
+    # Collect ALL offer items grouped by LV position and supplier
+    comparison = {}
+
+    # From processed matches
+    for m in all_matches:
+        oz = m.get("oz", "")
+        if not oz:
+            continue
+        if oz not in comparison:
+            comparison[oz] = {
+                "oz": oz,
+                "bezeichnung": m.get("bezeichnung", ""),
+                "einheit": m.get("lv_einheit", ""),
+                "menge": m.get("lv_menge", 0),
+                "suppliers": {},
+                "best_ep": None,
+                "best_supplier": "",
+            }
+
+        supplier = m.get("supplier", "Unbekannt")
+        ep = m.get("ep", 0)
+        source = m.get("match_source", "")
+
+        if supplier not in comparison[oz]["suppliers"] or ep < comparison[oz]["suppliers"][supplier]["ep"]:
+            comparison[oz]["suppliers"][supplier] = {
+                "ep": ep,
+                "source": source,
+                "text": m.get("offer_text", "")[:80],
+                "warning": m.get("warning", ""),
+                "column": m.get("column", "X"),
+            }
+
+    # Also scan ALL raw offer items for prices that didn't win
+    for offer in proj.get("offers", []):
+        supplier = offer.get("supplier", "Unbekannt")
+        items = offer.get("positionen", offer.get("items", []))
+        for item in items:
+            lv_ref = (item.get("lv_pos_nr") or "").strip()
+            if not lv_ref:
+                continue
+            import re as _re_pv
+            lv_ref = _re_pv.sub(r'\s*(ff\.?|alter\.?|alternativ)\s*$', '', lv_ref, flags=_re_pv.IGNORECASE).strip()
+            lv_ref_norm = _normalize_oz(lv_ref)
+            for oz, data in comparison.items():
+                if _normalize_oz(oz) == lv_ref_norm:
+                    ep = float(item.get("ep", 0) or 0)
+                    if ep > 0:
+                        item_text = (item.get("text") or "").lower()
+                        if "alternativ" in item_text:
+                            continue  # Skip alternatives
+                        if supplier not in data["suppliers"] or ep < data["suppliers"][supplier]["ep"]:
+                            data["suppliers"][supplier] = {
+                                "ep": ep,
+                                "source": "Angebot",
+                                "text": (item.get("text") or "")[:80],
+                                "warning": "",
+                                "column": "X",
+                            }
+                    break
+
+    # Calculate best price per position
+    for oz, data in comparison.items():
+        if data["suppliers"]:
+            real_suppliers = {k: v for k, v in data["suppliers"].items() if k != "AI Schätzung"}
+            pool = real_suppliers if real_suppliers else data["suppliers"]
+            if pool:
+                best = min(pool.items(), key=lambda x: x[1]["ep"])
+                data["best_ep"] = best[1]["ep"]
+                data["best_supplier"] = best[0]
+
+    sorted_comparison = sorted(comparison.values(), key=lambda x: x.get("oz", ""))
+
+    # Supplier statistics
+    all_suppliers = set()
+    for data in comparison.values():
+        all_suppliers.update(s for s in data["suppliers"] if s != "AI Schätzung")
+
+    supplier_stats = {}
+    for s in all_suppliers:
+        wins = sum(1 for d in comparison.values() if d.get("best_supplier") == s)
+        total_offered = sum(1 for d in comparison.values() if s in d["suppliers"])
+        total_value = sum(
+            d["suppliers"][s]["ep"] * d.get("menge", 1)
+            for d in comparison.values() if s in d["suppliers"]
+        )
+        supplier_stats[s] = {
+            "name": s,
+            "wins": wins,
+            "total_offered": total_offered,
+            "total_value": round(total_value, 2),
+        }
+
+    # Savings potential
+    total_savings = 0
+    savings_details = []
+    for data in comparison.values():
+        real = {s: info for s, info in data["suppliers"].items() if s != "AI Schätzung"}
+        if len(real) > 1:
+            prices = sorted(real.items(), key=lambda x: x[1]["ep"])
+            cheapest = prices[0]
+            expensive = prices[-1]
+            if expensive[1]["ep"] > cheapest[1]["ep"]:
+                saving = (expensive[1]["ep"] - cheapest[1]["ep"]) * data.get("menge", 1)
+                if saving > 5:
+                    savings_details.append({
+                        "oz": data["oz"],
+                        "bezeichnung": data["bezeichnung"][:50],
+                        "cheapest": cheapest[0],
+                        "cheapest_ep": cheapest[1]["ep"],
+                        "expensive": expensive[0],
+                        "expensive_ep": expensive[1]["ep"],
+                        "saving_per_unit": round(expensive[1]["ep"] - cheapest[1]["ep"], 2),
+                        "saving_total": round(saving, 2),
+                    })
+                    total_savings += saving
+
+    savings_details.sort(key=lambda x: x["saving_total"], reverse=True)
+
+    return {
+        "positions": sorted_comparison,
+        "suppliers": sorted(supplier_stats.values(), key=lambda x: x["wins"], reverse=True),
+        "total_positions": len(comparison),
+        "total_savings_potential": round(total_savings, 2),
+        "top_savings": savings_details[:20],
     }
 
 
