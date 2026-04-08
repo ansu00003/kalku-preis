@@ -733,6 +733,13 @@ async def run_matching(project_id: str):
     for key, neben in neben_by_key.items():
         if key in best_matches:
             haupt = best_matches[key]
+            # Validate: don't add same-type materials
+            ok, reason = validate_component_addition(
+                haupt.get("offer_text", ""), neben.get("offer_text", "")
+            )
+            if not ok:
+                all_warnings.append(f"Nebenmaterial NICHT addiert: {haupt['oz']} — {reason}")
+                continue
             # Create components array for multi-material position
             components = [
                 {
@@ -747,7 +754,7 @@ async def run_matching(project_id: str):
                 }
             ]
             haupt["components"] = components
-            haupt["ep"] = round(haupt["ep"] + neben["ep"], 2)  # Keep total for backward compat
+            haupt["ep"] = round(haupt["ep"] + neben["ep"], 2)
             haupt["explanation"] += f" + Nebenmaterial ({neben['offer_text'][:40]}): {neben['ep']:.2f}€"
             all_warnings.append(
                 f"Nebenmaterial addiert: {haupt['oz']} — {neben['offer_text'][:50]} ({neben['supplier']}) "

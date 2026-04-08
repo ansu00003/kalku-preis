@@ -5,7 +5,7 @@ from typing import List, Optional
 import openpyxl
 from openpyxl.styles import PatternFill, Font
 import config
-from matching.price_validator import validate_price
+from matching.price_validator import validate_match
 
 
 # Fills
@@ -88,7 +88,7 @@ def write_prices_to_lv(
     
     for match in matches:
         # Validate price before writing
-        is_valid, reason = validate_price(match.get("ep", 0), match.get("bezeichnung", ""), match.get("lv_einheit", match.get("einheit", "")))
+        is_valid, reason = validate_match(match)
         if not is_valid:
             report["warnings"].append({"oz": match.get("oz", ""), "warning": f"Nicht geschrieben: {reason}"})
             report["stats"]["skipped"] += 1
