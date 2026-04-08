@@ -885,6 +885,13 @@ async def run_matching(project_id: str):
         is_work = any(kw in bez_lower for kw in WORK_KEYWORDS)
         if is_work and any(mk in bez_lower for mk in _MAT_NAMES):
             is_work = False  # Has material → keep
+        # Pure earthwork: Boden is already there, nothing to buy
+        _PURE_EARTHWORK = ("lösen", "fördern", "lagern", "laden",
+                           "aushub", "abtrag", "abfuhr", "entsorgen",
+                           "roden", "abräumen", "saugbagger")
+        if "boden" in bez_lower and any(ew in bez_lower for ew in _PURE_EARTHWORK):
+            if "liefer" not in bez_lower and "verfüll" not in bez_lower:
+                is_work = True  # Pure earthwork, no material needed
         if is_work:
             continue
 
