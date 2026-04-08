@@ -97,6 +97,19 @@ def write_prices_to_lv(
         row = match["row"]
         is_nu = match.get("column") == "M"
         ep = match["ep"]
+
+        # Safety net: force NU for positions that are clearly services/work
+        if not is_nu:
+            _NU_KEYWORDS = ("dichtheitsprüfung", "dichtheitspr", "inspektion",
+                            "tv-befahrung", "kamerabefahrung", "kontrollprüfung",
+                            "druckprüfung", "dokumentation", "vermessung",
+                            "gutachten", "abnahme", "protokoll",
+                            "baustelleneinrichtung", "verkehrssicherung",
+                            "absperrung", "beschilderung")
+            bez = match.get("bezeichnung", "").lower()
+            if any(kw in bez for kw in _NU_KEYWORDS):
+                is_nu = True
+                match["column"] = "M"
         supplier = match.get("supplier", "")
         components = match.get("components", [])  # Multi-material components
         
