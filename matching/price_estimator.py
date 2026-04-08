@@ -361,6 +361,9 @@ async def estimate_missing_prices(positions: list, gaeb_data: dict = None) -> li
         langtext = gaeb_lookup.get(oz_norm, "")
         if langtext:
             entry["langtext"] = langtext[:500]
+        # Add price range hint if available (from price_validator)
+        if p.get("_price_hint"):
+            entry["preisbereich"] = p["_price_hint"]
         pos_list.append(entry)
 
     # Build learned context (show Claude what prices we already know)

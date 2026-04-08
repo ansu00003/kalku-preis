@@ -25,7 +25,7 @@ from matching.unit_converter import convert_unit_price, apply_nk_zuschlag
 from matching.price_estimator import estimate_missing_prices, save_learned_price
 from matching.price_database import add_prices_from_offer, add_price
 from matching.rules_engine import load_rules, save_rule, delete_rule, apply_rules
-from matching.price_validator import validate_match, validate_component_addition
+from matching.price_validator import validate_match, validate_component_addition, get_price_range
 from writer.excel_writer import write_prices_to_lv
 
 app = FastAPI(title="KALKU Preiseintragung", version="1.0.0")
@@ -822,6 +822,12 @@ async def run_matching(project_id: str):
         proj["progress"] = {"pct": 80, "step": f"AI Preisschätzung für {len(unmatched_material)} fehlende Positionen…"}
         await asyncio.sleep(0)
         try:
+            # Add price range hints to positions for the AI prompt
+            for pos in unmatched_material:
+                pr = get_price_range(pos["bezeichnung"])
+                if pr:
+                    pos["_price_hint"] = f"Preisbereich: {pr[0]:.2f}-{pr[1]:.2f} €/{pos.get('einheit', '')} ({pr[2]})"
+
             estimates = await estimate_missing_prices(unmatched_material, gaeb_data)
             for est in estimates:
                 if est.get("skip", False):
@@ -835,6 +841,17 @@ async def run_matching(project_id: str):
                         break
                 if not target_pos:
                     continue
+
+                # Validate AI estimate against price ranges
+                price_check = get_price_range(target_pos["bezeichnung"])
+                if price_check and est_ep > 0:
+                    min_p, max_p, key = price_check
+                    if est_ep < min_p * 0.5:
+                        all_warnings.append(f"AI-Schätzung zu niedrig: {target_pos['oz']} {est_ep:.2f}€ → korrigiert auf {min_p:.2f}€ ({key})")
+                        est_ep = min_p
+                    elif est_ep > max_p * 2.0:
+                        all_warnings.append(f"AI-Schätzung zu hoch: {target_pos['oz']} {est_ep:.2f}€ → korrigiert auf {max_p:.2f}€ ({key})")
+                        est_ep = max_p
 
                 column = determine_column(target_pos["bezeichnung"])
                 final_matches.append({
